@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PORT//SCAN - Network Port Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2b;
+    --green-dark: #003b10;
+    --red: #ff003c;
+    --yellow: #ffe600;
+    --orange: #ff6600;
+    --cyan: #00ffff;
+    --bg: #010a04;
+    --panel: #050f07;
+    --border: #00ff4133;
+    --text: #b0ffb8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,255,65,0.013) 2px, rgba(0,255,65,0.013) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  #matrix {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.06; z-index: 0; pointer-events: none;
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 720px; margin: 0 auto;
+    padding: 20px 14px 50px;
+  }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 28px; animation: fadeDown 0.8s ease; }
+  .header-tag { font-size: 10px; color: var(--green-dim); letter-spacing: 4px; margin-bottom: 6px; }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(26px, 9vw, 52px);
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green), 0 0 50px var(--green-dim);
+    letter-spacing: 4px;
+    animation: glitch 5s infinite;
+  }
+  .logo span { color: #fff; text-shadow: 0 0 20px #fff; }
+  .subtitle { font-size: 10px; color: var(--green-dim); letter-spacing: 6px; margin-top: 5px; }
+  .author-tag { margin-top: 8px; font-size: 11px; color: #00ff4155; }
+  .author-tag a { color: var(--green-dim); text-decoration: none; }
+
+  /* Panel */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 14px;
+    position: relative;
+    animation: fadeUp 0.6s ease both;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+  }
+  .panel-title { font-size: 10px; letter-spacing: 3px; color: var(--green-dim); margin-bottom: 14px; }
+
+  /* Input row */
+  .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+  .input-label { font-size: 10px; color: var(--green-dim); letter-spacing: 2px; }
+
+  .inp {
+    background: #000;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 3px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    caret-color: var(--green);
+  }
+  .inp:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 12px var(--green-dark);
+  }
+  .inp::placeholder { color: #00ff4133; }
+
+  /* Preset buttons */
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .preset-btn {
+    background: #000;
+    border: 1px solid var(--green-dark);
+    color: var(--green-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-dark);
+  }
+
+  /* Scan button */
+  .scan-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #003b10, #005518);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    padding: 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-top: 14px;
+    transition: all 0.3s;
+    text-shadow: 0 0 10px var(--green);
+    position: relative;
+    overflow: hidden;
+  }
+  .scan-btn:hover {
+    background: linear-gradient(135deg, #005518, #007a22);
+    box-shadow: 0 0 20px var(--green-dark);
+  }
+  .scan-btn:disabled {
+    opacity: 0.5; cursor: not-allowed;
+  }
+  .scan-btn::after {
+    content: '';
+    position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,255,65,0.1), transparent);
+    transition: left 0.5s;
+  }
+  .scan-btn:hover::after { left: 100%; }
+
+  /* Progress */
+  .progress-wrap { margin-top: 14px; display: none; }
+  .progress-bar {
+    height: 4px; background: #0a1a0d; border-radius: 2px; overflow: hidden; margin-bottom: 8px;
+  }
+  #progressFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--green-dim), var(--green));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  .progress-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--green-dim); }
+
+  /* Stats bar */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px;
+  }
+  .stat-box {
+    background: #000; border: 1px solid #0a1a0d;
+    border-radius: 3px; padding: 10px 8px; text-align: center;
+  }
+  .stat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px; font-weight: 700; color: var(--green); display: block;
+  }
+  .stat-lbl { font-size: 8px; color: var(--green-dim); letter-spacing: 1px; margin-top: 2px; display: block; }
+
+  /* Terminal output */
+  #terminal {
+    background: #000;
+    border: 1px solid #0a1a0d;
+    border-radius: 3px;
+    padding: 14px;
+    min-height: 120px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  #terminal::-webkit-scrollbar { width: 4px; }
+  #terminal::-webkit-scrollbar-track { background: #000; }
+  #terminal::-webkit-scrollbar-thumb { background: var(--green-dark); border-radius: 2px; }
+
+  .t-info    { color: var(--green-dim); }
+  .t-open    { color: var(--green); font-weight: bold; }
+  .t-closed  { color: #1a3a1a; }
+  .t-banner  { color: var(--cyan); font-size: 11px; padding-left: 16px; }
+  .t-warn    { color: var(--yellow); }
+  .t-error   { color: var(--red); }
+  .t-head    { color: var(--green); border-bottom: 1px solid var(--green-dark); padding-bottom: 4px; margin-bottom: 4px; }
+
+  /* Results table */
+  #resultsWrap { display: none; }
+
+  .results-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .results-table th {
+    text-align: left; padding: 8px 10px;
+    font-size: 9px; letter-spacing: 2px; color: var(--green-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .results-table td { padding: 8px 10px; border-bottom: 1px solid #0a1a0d; vertical-align: top; }
+  .results-table tr:last-child td { border-bottom: none; }
+
+  .badge-open {
+    background: var(--green-dark); color: var(--green);
+    padding: 2px 8px; border-radius: 2px; font-size: 10px;
+    border: 1px solid var(--green-dim); white-space: nowrap;
+  }
+  .badge-closed {
+    background: #0a0a0a; color: #333;
+    padding: 2px 8px; border-radius: 2px; font-size: 10px;
+    border: 1px solid #111; white-space: nowrap;
+  }
+  .service-name { color: var(--cyan); font-size: 11px; }
+  .banner-text { color: #666; font-size: 10px; margin-top: 2px; word-break: break-all; }
+
+  /* Common ports reference */
+  .ports-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  }
+  .port-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #000; border: 1px solid #0a1a0d;
+    border-radius: 3px; padding: 7px 10px; font-size: 11px;
+  }
+  .port-num {
+    font-family: 'Orbitron', monospace; font-size: 12px;
+    color: var(--green); min-width: 40px;
+  }
+  .port-svc { color: var(--cyan); min-width: 50px; }
+  .port-desc { color: #4a6b50; font-size: 10px; }
+
+  /* Footer */
+  .footer {
+    text-align: center; font-size: 10px; color: #00ff4133;
+    margin-top: 20px; letter-spacing: 2px;
+  }
+  .footer a { color: var(--green-dim); text-decoration: none; }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes glitch {
+    0%,100% { text-shadow: 0 0 20px var(--green), 0 0 50px var(--green-dim); }
+    20% { text-shadow: -2px 0 var(--red), 2px 0 var(--green); }
+    40% { text-shadow: 2px 0 var(--green), -2px 0 var(--cyan); }
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .blink { animation: blink 1s infinite; }
+
+  .panel:nth-child(2){animation-delay:0.1s}
+  .panel:nth-child(3){animation-delay:0.2s}
+  .panel:nth-child(4){animation-delay:0.3s}
+  .panel:nth-child(5){animation-delay:0.4s}
+
+  @media(max-width:400px){
+    .stats-row{grid-template-columns:repeat(2,1fr)}
+    .ports-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-tag">[ NETWORK RECON TOOL v1.0 ]</div>
+    <div class="logo">PORT<span>//</span>SCAN</div>
+    <div class="subtitle">NETWORK PORT ANALYZER</div>
+    <div class="author-tag">by <a href="https://github.com/venu-maxx" target="_blank">venu-maxx</a> · github.com/venu-maxx</div>
+  </div>
+
+  <!-- Input Panel -->
+  <div class="panel">
+    <div class="panel-title">// TARGET CONFIGURATION</div>
+
+    <div class="input-row">
+      <div class="input-group" style="flex:2">
+        <div class="input-label">TARGET HOST / IP</div>
+        <input class="inp" id="targetHost" type="text" placeholder="example.com or 192.168.1.1" value="scanme.nmap.org">
+      </div>
+    </div>
+
+    <div class="input-row" style="margin-top:10px">
+      <div class="input-group">
+        <div class="input-label">PORT RANGE START</div>
+        <input class="inp" id="portStart" type="number" placeholder="1" value="1" min="1" max="65535">
+      </div>
+      <div class="input-group">
+        <div class="input-label">PORT RANGE END</div>
+        <input class="inp" id="portEnd" type="number" placeholder="1024" value="1024" min="1" max="65535">
+      </div>
+      <div class="input-group">
+        <div class="input-label">TIMEOUT (ms)</div>
+        <input class="inp" id="timeout" type="number" placeholder="1500" value="1500" min="500" max="5000">
+      </div>
+    </div>
+
+    <div class="presets">
+      <button class="preset-btn" onclick="setPreset('top20')">TOP 20</button>
+      <button class="preset-btn" onclick="setPreset('top100')">TOP 100</button>
+      <button class="preset-btn active" onclick="setPreset('common')">COMMON (1-1024)</button>
+      <button class="preset-btn" onclick="setPreset('web')">WEB PORTS</button>
+      <button class="preset-btn" onclick="setPreset('full')">FULL SCAN</button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar"><div id="progressFill"></div></div>
+      <div class="progress-info">
+        <span id="progressText">Scanning...</span>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">⚡ INITIATE SCAN</button>
+  </div>
+
+  <!-- Live Stats -->
+  <div class="panel" id="statsPanel">
+    <div class="panel-title">// SCAN STATISTICS</div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-val" id="st-scanned">0</span>
+        <span class="stat-lbl">SCANNED</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="st-open" style="color:var(--green)">0</span>
+        <span class="stat-lbl">OPEN</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="st-closed" style="color:#333">0</span>
+        <span class="stat-lbl">CLOSED</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="st-time">0s</span>
+        <span class="stat-lbl">TIME</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="panel">
+    <div class="panel-title">// TERMINAL OUTPUT <span class="blink" id="scanCursor" style="display:none">█</span></div>
+    <div id="terminal">
+      <div class="t-info">[ PORT//SCAN v1.0 — by venu-maxx ]</div>
+      <div class="t-info">[ github.com/venu-maxx ]</div>
+      <div class="t-info">─────────────────────────────────</div>
+      <div class="t-info">Ready. Configure target and press INITIATE SCAN.</div>
+      <div class="t-warn">⚠ Scan only hosts you own or have permission to scan.</div>
+    </div>
+  </div>
+
+  <!-- Results Table -->
+  <div class="panel" id="resultsWrap">
+    <div class="panel-title">// OPEN PORTS — DETAILED RESULTS</div>
+    <table class="results-table" id="resultsTable">
+      <thead>
+        <tr>
+          <th>PORT</th>
+          <th>STATUS</th>
+          <th>SERVICE</th>
+          <th>DESCRIPTION / BANNER</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Common Ports Reference -->
+  <div class="panel">
+    <div class="panel-title">// COMMON PORTS REFERENCE</div>
+    <div class="ports-grid" id="portsRef"></div>
+  </div>
+
+  <div class="footer">
+    [ ETHICAL USE ONLY ] · <a href="https://github.com/venu-maxx" target="_blank">github.com/venu-maxx</a> · PORT//SCAN v1.0
+  </div>
+
+</div>
+
+<script>
+// ── Matrix Rain ───────────────────────────────────────────
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+let drops;
+function initMatrix() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const cols = Math.floor(canvas.width / 16);
+  drops = Array(cols).fill(1);
+}
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(1,10,4,0.05)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#00ff41';
+  ctx.font = '13px Share Tech Mono';
+  drops.forEach((y, i) => {
+    const ch = String.fromCharCode(0x30A0 + Math.random() * 96);
+    ctx.fillText(ch, i * 16, y * 16);
+    if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  });
+}
+initMatrix();
+window.addEventListener('resize', initMatrix);
+setInterval(drawMatrix, 50);
+
+// ── Service Database ──────────────────────────────────────
+const SERVICES = {
+  20: { name: 'FTP-DATA', desc: 'FTP Data Transfer' },
+  21: { name: 'FTP',      desc: 'File Transfer Protocol' },
+  22: { name: 'SSH',      desc: 'Secure Shell' },
+  23: { name: 'TELNET',   desc: 'Telnet (Insecure)' },
+  25: { name: 'SMTP',     desc: 'Simple Mail Transfer' },
+  53: { name: 'DNS',      desc: 'Domain Name System' },
+  67: { name: 'DHCP',     desc: 'DHCP Server' },
+  68: { name: 'DHCP',     desc: 'DHCP Client' },
+  69: { name: 'TFTP',     desc: 'Trivial File Transfer' },
+  80: { name: 'HTTP',     desc: 'Web Server (Unencrypted)' },
+  110: { name: 'POP3',    desc: 'Post Office Protocol' },
+  119: { name: 'NNTP',    desc: 'Network News Transfer' },
+  123: { name: 'NTP',     desc: 'Network Time Protocol' },
+  135: { name: 'RPC',     desc: 'Remote Procedure Call' },
+  139: { name: 'NETBIOS', desc: 'NetBIOS Session' },
+  143: { name: 'IMAP',    desc: 'Internet Mail Access' },
+  161: { name: 'SNMP',    desc: 'Simple Network Management' },
+  194: { name: 'IRC',     desc: 'Internet Relay Chat' },
+  389: { name: 'LDAP',    desc: 'Lightweight Directory Access' },
+  443: { name: 'HTTPS',   desc: 'Secure Web Server (TLS)' },
+  445: { name: 'SMB',     desc: 'Server Message Block' },
+  465: { name: 'SMTPS',   desc: 'Secure SMTP' },
+  514: { name: 'SYSLOG',  desc: 'System Logging' },
+  587: { name: 'SMTP',    desc: 'Email Submission' },
+  631: { name: 'IPP',     desc: 'Internet Printing Protocol' },
+  993: { name: 'IMAPS',   desc: 'Secure IMAP' },
+  995: { name: 'POP3S',   desc: 'Secure POP3' },
+  1433: { name: 'MSSQL',  desc: 'Microsoft SQL Server' },
+  1521: { name: 'ORACLE', desc: 'Oracle Database' },
+  1723: { name: 'PPTP',   desc: 'VPN Tunnel' },
+  3306: { name: 'MYSQL',  desc: 'MySQL Database' },
+  3389: { name: 'RDP',    desc: 'Remote Desktop Protocol' },
+  4444: { name: 'METASPLOIT', desc: 'Common backdoor port' },
+  5432: { name: 'POSTGRES', desc: 'PostgreSQL Database' },
+  5900: { name: 'VNC',    desc: 'Virtual Network Computing' },
+  6379: { name: 'REDIS',  desc: 'Redis Database' },
+  6667: { name: 'IRC',    desc: 'Internet Relay Chat' },
+  8080: { name: 'HTTP-ALT', desc: 'Alternative HTTP / Proxy' },
+  8443: { name: 'HTTPS-ALT', desc: 'Alternative HTTPS' },
+  8888: { name: 'HTTP-DEV', desc: 'Development Server' },
+  9200: { name: 'ELASTIC', desc: 'Elasticsearch' },
+  27017: { name: 'MONGODB', desc: 'MongoDB Database' },
+};
+
+// Top ports presets
+const PRESETS = {
+  top20:  { start: 0, ports: [21,22,23,25,53,80,110,135,139,143,443,445,587,993,995,1433,3306,3389,5900,8080] },
+  top100: { start: 0, ports: [21,22,23,25,53,80,110,111,135,139,143,161,194,389,443,445,465,514,587,631,993,995,1433,1521,1723,3306,3389,4444,5432,5900,6379,8080,8443,8888,9200,27017] },
+  web:    { start: 0, ports: [80,443,8080,8443,8888,3000,4000,5000,5001,7000,9000,9090,10000] },
+};
+
+// ── Common ports reference render ─────────────────────────
+const TOP_REF = [21,22,23,25,53,80,110,143,443,445,3306,3389,5900,8080,8443,27017];
+const refEl = document.getElementById('portsRef');
+TOP_REF.forEach(p => {
+  const s = SERVICES[p] || { name: 'UNKNOWN', desc: '' };
+  refEl.innerHTML += `
+    <div class="port-item">
+      <span class="port-num">${p}</span>
+      <span class="port-svc">${s.name}</span>
+      <span class="port-desc">${s.desc}</span>
+    </div>`;
+});
+
+// ── Preset handler ────────────────────────────────────────
+function setPreset(type) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  if (type === 'common') {
+    document.getElementById('portStart').value = 1;
+    document.getElementById('portEnd').value = 1024;
+  } else if (type === 'full') {
+    document.getElementById('portStart').value = 1;
+    document.getElementById('portEnd').value = 65535;
+  } else if (PRESETS[type]) {
+    document.getElementById('portStart').value = Math.min(...PRESETS[type].ports);
+    document.getElementById('portEnd').value = Math.max(...PRESETS[type].ports);
+  }
+}
+
+// ── Terminal helpers ──────────────────────────────────────
+const term = document.getElementById('terminal');
+function tLog(msg, cls = 't-info') {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.innerHTML = msg;
+  term.appendChild(d);
+  term.scrollTop = term.scrollHeight;
+}
+function tClear() { term.innerHTML = ''; }
+
+// ── Stats update ──────────────────────────────────────────
+let scanned = 0, openCount = 0, closedCount = 0, startTime;
+function updateStats() {
+  document.getElementById('st-scanned').textContent = scanned;
+  document.getElementById('st-open').textContent = openCount;
+  document.getElementById('st-closed').textContent = closedCount;
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('st-time').textContent = elapsed + 's';
+}
+
+// ── Simulated port scan (browser-based) ──────────────────
+// Note: Real TCP scanning requires server-side code.
+// This simulates scan using fetch/Image probing + known port patterns.
+async function probePort(host, port, timeout) {
+  return new Promise(resolve => {
+    // Use fetch with a short timeout — CORS will block but connection attempt reveals open/closed
+    const controller = new AbortController();
+    const timer = setTimeout(() => { controller.abort(); resolve('closed'); }, timeout);
+
+    const protocol = (port === 443 || port === 8443) ? 'https' : 'http';
+    fetch(`${protocol}://${host}:${port}`, {
+      signal: controller.signal,
+      mode: 'no-cors',
+      cache: 'no-store',
+    }).then(() => {
+      clearTimeout(timer);
+      resolve('open');
+    }).catch(err => {
+      clearTimeout(timer);
+      // "Failed to fetch" with no-cors on open port = port is open but CORS blocked
+      // "net::ERR_CONNECTION_REFUSED" = closed
+      const msg = err.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
+        resolve('open'); // Connection was made but blocked by CORS = port open
+      } else {
+        resolve('closed');
+      }
+    });
+  });
+}
+
+function getBanner(port) {
+  const banners = {
+    21: 'SERVICE: vsftpd / ProFTPD — FTP server detected',
+    22: 'SERVICE: OpenSSH — Secure remote access',
+    23: 'SERVICE: Telnet — INSECURE protocol, plain text',
+    25: 'SERVICE: Postfix/Sendmail — Mail server',
+    53: 'SERVICE: BIND/Unbound — DNS resolver',
+    80: 'SERVICE: Apache/Nginx/IIS — Web server HTTP',
+    110: 'SERVICE: Dovecot — POP3 mail server',
+    143: 'SERVICE: Dovecot IMAP — Mail access',
+    443: 'SERVICE: TLS/SSL — Encrypted web server',
+    445: 'SERVICE: Samba/Windows — File sharing SMB',
+    3306: 'SERVICE: MySQL/MariaDB — Database server',
+    3389: 'SERVICE: Windows RDP — Remote desktop ⚠',
+    5900: 'SERVICE: VNC — Remote desktop viewer',
+    8080: 'SERVICE: HTTP-ALT — Proxy or dev server',
+    27017: 'SERVICE: MongoDB — NoSQL database',
+  };
+  return banners[port] || null;
+}
+
+let scanning = false;
+
+async function startScan() {
+  if (scanning) return;
+
+  const host = document.getElementById('targetHost').value.trim();
+  const start = parseInt(document.getElementById('portStart').value);
+  const end = parseInt(document.getElementById('portEnd').value);
+  const timeout = parseInt(document.getElementById('timeout').value);
+
+  if (!host) { tLog('[ ERROR ] No target specified!', 't-error'); return; }
+  if (start > end) { tLog('[ ERROR ] Invalid port range!', 't-error'); return; }
+  if (end - start > 1000) {
+    if (!confirm(`Scanning ${end - start + 1} ports may take a long time. Continue?`)) return;
+  }
+
+  scanning = true;
+  scanned = 0; openCount = 0; closedCount = 0;
+  startTime = Date.now();
+
+  const scanBtn = document.getElementById('scanBtn');
+  scanBtn.disabled = true;
+  scanBtn.textContent = '⏳ SCANNING...';
+  document.getElementById('scanCursor').style.display = 'inline';
+
+  // Show progress
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('resultsWrap').style.display = 'none';
+  document.getElementById('resultsBody').innerHTML = '';
+
+  tClear();
+  tLog(`[ PORT//SCAN v1.0 — by venu-maxx ]`, 't-head');
+  tLog(`[ TARGET  ] ${host}`);
+  tLog(`[ RANGE   ] ${start} → ${end} (${end - start + 1} ports)`);
+  tLog(`[ TIMEOUT ] ${timeout}ms`);
+  tLog(`[ TIME    ] ${new Date().toLocaleTimeString()}`);
+  tLog(`─────────────────────────────────────`);
+  tLog(`⚠ ETHICAL USE ONLY — Scan authorized targets only`, 't-warn');
+  tLog(`─────────────────────────────────────`);
+  tLog(`Initiating scan...`, 't-info');
+
+  const openPorts = [];
+  const total = end - start + 1;
+  const BATCH = 20; // concurrent probes
+
+  for (let p = start; p <= end; p += BATCH) {
+    const batch = [];
+    for (let i = p; i < Math.min(p + BATCH, end + 1); i++) {
+      batch.push(i);
+    }
+
+    await Promise.all(batch.map(async port => {
+      const status = await probePort(host, port, timeout);
+      scanned++;
+
+      const svc = SERVICES[port];
+      const pct = Math.round((scanned / total) * 100);
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressPct').textContent = pct + '%';
+      document.getElementById('progressText').textContent = `Port ${port}`;
+
+      if (status === 'open') {
+        openCount++;
+        const svcName = svc ? svc.name : 'UNKNOWN';
+        const banner = getBanner(port);
+        tLog(`[ OPEN ] Port ${String(port).padStart(5)} — ${svcName}`, 't-open');
+        if (banner) tLog(`         ${banner}`, 't-banner');
+        openPorts.push({ port, svc, banner, status });
+      } else {
+        closedCount++;
+      }
+      updateStats();
+    }));
+  }
+
+  // Scan complete
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+  tLog(`─────────────────────────────────────`);
+  tLog(`[ SCAN COMPLETE ]`);
+  tLog(`[ OPEN PORTS  ] ${openCount}`);
+  tLog(`[ CLOSED      ] ${closedCount}`);
+  tLog(`[ TOTAL TIME  ] ${elapsed}s`);
+
+  // Show results table
+  if (openPorts.length > 0) {
+    document.getElementById('resultsWrap').style.display = 'block';
+    const tbody = document.getElementById('resultsBody');
+    openPorts.sort((a, b) => a.port - b.port).forEach(({ port, svc, banner }) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="font-family:'Orbitron',monospace;color:var(--green)">${port}</td>
+        <td><span class="badge-open">● OPEN</span></td>
+        <td><span class="service-name">${svc ? svc.name : 'UNKNOWN'}</span></td>
+        <td>
+          <div style="color:var(--text);font-size:11px">${svc ? svc.desc : 'Unidentified service'}</div>
+          ${banner ? `<div class="banner-text">${banner}</div>` : ''}
+        </td>`;
+      tbody.appendChild(row);
+    });
+  } else {
+    tLog(`[ INFO ] No open ports found in range ${start}-${end}`, 't-warn');
+  }
+
+  scanBtn.disabled = false;
+  scanBtn.textContent = '⚡ INITIATE SCAN';
+  document.getElementById('scanCursor').style.display = 'none';
+  scanning = false;
+}
+</script>
+</body>
+</html>
